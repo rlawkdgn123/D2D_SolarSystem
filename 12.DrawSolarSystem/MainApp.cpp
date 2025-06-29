@@ -39,7 +39,6 @@ bool MainApp::Initialize()
 
      // m_TestScenePtr = std::make_shared<HierarchicalTransformTestScene>();
     
-    
     m_TestScenePtr->SetUp(m_hWnd);
 
     return true;
@@ -73,7 +72,6 @@ void MainApp::Run()
 void MainApp::Finalize()
 {
     __super::Destroy();
-
 }
 
 void MainApp::UpdateTime()
@@ -97,5 +95,4 @@ void MainApp::OnClose()
     std::cout << "OnClose !!!" << std::endl;
 
     SolarSystemRenderer::Instance().Uninitialize();
-
 }

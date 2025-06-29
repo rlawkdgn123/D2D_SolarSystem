@@ -9,14 +9,12 @@
 class CelestialObj;
 
 
-enum E_CelestialObj {
-    Sun = 0, Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune
+enum class E_CelestialObj {
+    Sun, Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune
 };
-enum E_Satlelite {
-    Moon = 0, Phobos, Deimos, Io, Europa, Ganymede, Callisto,
-    Titan, Enceladus, Miranda, Titania, Oberon, Triton
+enum class E_Satellite {
+    Moon = 0, Phobos, Deimos, Io, Europa, Ganymede,  Callisto, Titan, Enceladus, Miranda, Titania, Oberon, Triton
 };
-
 class TransformPracticeScene : public OnlyForTestScene
 {
 public:
@@ -43,6 +41,10 @@ private:
 
     void AddCelObjects(D2D1_POINT_2F point);
 
+    void AddCelObjects(D2D1_POINT_2F point, E_CelestialObj celObj);
+
+    void AddCelObjects(D2D1_POINT_2F point, E_Satellite satObj);
+
     void ClearCelObjects();
 
     void SelectCelObject(D2D1_POINT_2F point); // 지금 예제 미사용
@@ -54,10 +56,12 @@ private:
     UnityCamera m_UnityCamera;
 
     ComPtr<ID2D1Bitmap1> m_BitmapPtr; // 비트맵 기본값 (고양이)
+
     // 태양계 천체 : 태양,수금지화목토천해
     ComPtr<ID2D1Bitmap1> m_CelBitmapPtr[9]; // 비트맵 COM객체
+
     // 위성 : 지구(달), 화성(포보스, 데이모스), 목성(유로파, 이오, 가니메데, 칼리스토),토성(타이탄), 천왕성(미란다), 해왕성(트리톤)
-    //ComPtr<ID2D1Bitmap1> m_SubCelBitmapPtr[10];
+    ComPtr<ID2D1Bitmap1> m_SatBitmapPtr[13];
 
     std::vector<CelestialObj*> m_CelObjects; // 천체 오브젝트 리스트
 

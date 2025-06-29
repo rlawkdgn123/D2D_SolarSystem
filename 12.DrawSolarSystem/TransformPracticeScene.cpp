@@ -38,11 +38,13 @@ public:
     void Update(float deltaTime)
     {
         if (m_isSelfRotation) {
-            m_transform.Rotate(deltaTime * 36.f); // 자기 회전 (시간 * 회전량)
+            m_transform.Rotate(deltaTime * m_selfRotation); // 자기 회전 (시간 * 회전량)
         }
     }
         
     void Draw(TestRenderer& testRender, D2D1::Matrix3x2F viewTM) {
+
+        if (m_isInvisible) return;
         //static D2D1_RECT_F s_rect = D2D1::RectF(0.f, 0.f, 100.f, 100.f);
         static D2D1_RECT_F s_rect = D2D1::RectF(0.f, 0.f, 100.f, 100.f);
 
@@ -64,8 +66,11 @@ public:
     }
 
     void SetPosition(const Vec2& pos) { m_transform.SetPosition(pos); } // Transform Pos 위치 이동
+    void SetCenterPosition() { m_transform.SetPosition({ -m_rect.right / 2.0f, -m_rect.bottom / 2.0f }); }
+    void SetInvisible(bool invisible) { m_isInvisible = invisible; }
     void Move(const Vec2& offset) { m_transform.Translate(offset); } // Transform 보간 이동
     void Rotate(float angle) { m_transform.Rotate(angle); } // Transform 회전
+    void SetSelfRotate(float angle) { m_selfRotation = angle; }
     void ToggleSelected() { m_isSelected = !m_isSelected; } // 선택 토글
     bool IsSelected() const { return m_isSelected; } // 선택 여부 리턴
     void ToggleSelfRotation() { m_isSelfRotation = !m_isSelfRotation; } // 자기 회전 토글
@@ -126,6 +131,9 @@ private:
     bool m_isSelected = false; // 선택 여부
     bool m_isLeader = false; // 리더 박스 여부
     bool m_isSelfRotation = false; // 자전 여부
+    bool m_isInvisible = false; // 비트맵 그리기 여부
+
+    float m_selfRotation = 36.f;
 
     ComPtr<ID2D1Bitmap1> m_BitmapPtr; // 비트맵 주소
     
@@ -153,7 +161,7 @@ void TransformPracticeScene::SetUp(HWND hWnd)
     L"가상의 태양계를 만들어 주세요. 물리 법칙은 무시 합니다. ^^;;");
 
     std::cout << "태양은 자전을 해야 합니다." << std::endl;
-    std::cout << "행성들은 자전을 하며 동시에 태영의 자전에 영향을 받아 공전하는 것처럼 보입니다."<< std::endl;
+    std::cout << "행성들은 자전을 하며 동시에 태양의 자전에 영향을 받아 공전하는 것처럼 보입니다."<< std::endl;
     std::cout << "달은 자전을 하면서 동시에 지구의 자전에 영향을 받아 공전하는 것처럼 보입니다." << std::endl;
     std::cout << "회전 속도는 자유롭게 설정하세요." << std::endl;
 
@@ -170,100 +178,187 @@ void TransformPracticeScene::SetUp(HWND hWnd)
         center = D2D1_POINT_2F{ w / 2,h / 2 };
         m_UnityCamera.SetScreenSize(w, h);
     }
-
-
-    float dis = 120.f; // 수성 초기 거리
-    float n = 60.f;    // 기본 증가값 (가중치로 곱할 것)
-
     // 태양
     AddCelObjects(center);
     CelestialObj* sun = m_CelObjects.back();
-    sun->GetTransform()->SetScale(Vec2(6.f, 6.f)); // 가장 큼
-    sun->SetPosition(Vec2(-60, -60));
+    sun->GetTransform()->SetScale(Vec2(3.f, 3.f));
+    sun->SetCenterPosition();
     sun->SetLeader(true);
-    sun->ToggleSelfRotation();
+    // 태양은 자전 없음
 
-    // 수성
+    float dis = 120.f;
+    float n = 90.f;
+
+    // 수성 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* mercury_pivot = m_CelObjects.back();
+    mercury_pivot->SetInvisible(true);
+    mercury_pivot->SetCenterPosition();
+    mercury_pivot->SetParent(sun);
+    mercury_pivot->SetSelfRotate(30.f);
+    mercury_pivot->ToggleSelfRotation();
+
+    // 수성 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Mercury = m_CelObjects.back();
-    Mercury->SetParent(sun);
-    Mercury->GetTransform()->SetScale(Vec2(0.5f, 0.5f)); // 0.38 → 보정
-    Mercury->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Mercury->SetParent(mercury_pivot);
+    Mercury->GetTransform()->SetScale(Vec2(0.5f, 0.5f));
+    Mercury->SetCenterPosition();
+    Mercury->SetPosition(Vec2(dis, dis));
+    Mercury->SetSelfRotate(24.f);
     Mercury->ToggleSelfRotation();
-    dis += n * 0.4f;
+    dis += n;
 
-    // 금성
+    // 금성 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* venus_pivot = m_CelObjects.back();
+    venus_pivot->SetInvisible(true);
+    venus_pivot->SetCenterPosition();
+    venus_pivot->SetParent(sun);
+    venus_pivot->SetSelfRotate(20.f);
+    venus_pivot->ToggleSelfRotation();
+
+    // 금성 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Venus = m_CelObjects.back();
-    Venus->SetParent(sun);
-    Venus->GetTransform()->SetScale(Vec2(0.95f, 0.95f));
-    Venus->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Venus->SetParent(venus_pivot);
+    Venus->GetTransform()->SetScale(Vec2(0.65f, 0.65f));
+    Venus->SetCenterPosition();
+    Venus->SetPosition(Vec2(dis, dis));
+    Venus->SetSelfRotate(16.f);
     Venus->ToggleSelfRotation();
-    dis += n * 0.7f;
+    dis += n;
 
-    // 지구
+    // 지구 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* earth_pivot = m_CelObjects.back();
+    earth_pivot->SetInvisible(true);
+    earth_pivot->SetCenterPosition();
+    earth_pivot->SetParent(sun);
+    earth_pivot->SetSelfRotate(16.f);
+    earth_pivot->ToggleSelfRotation();
+
+    // 지구 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Earth = m_CelObjects.back();
-    Earth->SetParent(sun);
-    Earth->GetTransform()->SetScale(Vec2(1.0f, 1.0f));
-    Earth->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Earth->SetParent(earth_pivot);
+    Earth->GetTransform()->SetScale(Vec2(0.7f, 0.7f));
+    Earth->SetCenterPosition();
+    Earth->SetPosition(Vec2(dis, dis));
+    Earth->SetSelfRotate(18.f);
     Earth->ToggleSelfRotation();
-    dis += n * 1.0f;
+    dis += n;
 
-    // 달
+    // 달 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Moon = m_CelObjects.back();
     Moon->SetParent(Earth);
-    Moon->GetTransform()->SetScale(Vec2(0.27f, 0.27f)); // 지구 대비 달 크기
-    Moon->SetPosition(Vec2(-30, -30)); // 지구 기준 오프셋
+    Moon->GetTransform()->SetScale(Vec2(0.3f, 0.3f));
+    Moon->SetCenterPosition();
+    Moon->SetPosition(Vec2(30.f, 0.f));
+    Moon->SetSelfRotate(24.f);
     Moon->ToggleSelfRotation();
 
-    // 화성
+    // 화성 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* mars_pivot = m_CelObjects.back();
+    mars_pivot->SetInvisible(true);
+    mars_pivot->SetCenterPosition();
+    mars_pivot->SetParent(sun);
+    mars_pivot->SetSelfRotate(12.f);
+    mars_pivot->ToggleSelfRotation();
+
+    // 화성 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Mars = m_CelObjects.back();
-    Mars->SetParent(sun);
-    Mars->GetTransform()->SetScale(Vec2(0.53f, 0.53f));
-    Mars->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Mars->SetParent(mars_pivot);
+    Mars->GetTransform()->SetScale(Vec2(0.6f, 0.6f));
+    Mars->SetCenterPosition();
+    Mars->SetPosition(Vec2(dis, dis));
+    Mars->SetSelfRotate(15.f);
     Mars->ToggleSelfRotation();
-    dis += n * 1.5f;
+    dis += n;
 
-    // 목성
+    // 목성 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* jupiter_pivot = m_CelObjects.back();
+    jupiter_pivot->SetInvisible(true);
+    jupiter_pivot->SetCenterPosition();
+    jupiter_pivot->SetParent(sun);
+    jupiter_pivot->SetSelfRotate(8.f);
+    jupiter_pivot->ToggleSelfRotation();
+
+    // 목성 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Jupiter = m_CelObjects.back();
-    Jupiter->SetParent(sun);
-    Jupiter->GetTransform()->SetScale(Vec2(4.5f, 4.5f)); // 실제 비율 11.2지만 너무 크기 때문에 절충
-    Jupiter->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Jupiter->SetParent(jupiter_pivot);
+    Jupiter->GetTransform()->SetScale(Vec2(1.5f, 1.5f));
+    Jupiter->SetCenterPosition();
+    Jupiter->SetPosition(Vec2(dis, dis));
+    Jupiter->SetSelfRotate(12.f);
     Jupiter->ToggleSelfRotation();
-    dis += n * 5.2f;
+    dis += n;
 
-    // 토성
+    // 토성 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* saturn_pivot = m_CelObjects.back();
+    saturn_pivot->SetInvisible(true);
+    saturn_pivot->SetCenterPosition();
+    saturn_pivot->SetParent(sun);
+    saturn_pivot->SetSelfRotate(7.f);
+    saturn_pivot->ToggleSelfRotation();
+
+    // 토성 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Saturn = m_CelObjects.back();
-    Saturn->SetParent(sun);
-    Saturn->GetTransform()->SetScale(Vec2(3.8f, 3.8f));
-    Saturn->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Saturn->SetParent(saturn_pivot);
+    Saturn->GetTransform()->SetScale(Vec2(1.3f, 1.3f));
+    Saturn->SetCenterPosition();
+    Saturn->SetPosition(Vec2(dis, dis));
+    Saturn->SetSelfRotate(10.f);
     Saturn->ToggleSelfRotation();
-    dis += n * 4.0f;
+    dis += n;
 
-    // 천왕성
+    // 천왕성 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* uranus_pivot = m_CelObjects.back();
+    uranus_pivot->SetInvisible(true);
+    uranus_pivot->SetCenterPosition();
+    uranus_pivot->SetParent(sun);
+    uranus_pivot->SetSelfRotate(6.f);
+    uranus_pivot->ToggleSelfRotation();
+
+    // 천왕성 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Uranus = m_CelObjects.back();
-    Uranus->SetParent(sun);
-    Uranus->GetTransform()->SetScale(Vec2(2.0f, 2.0f));
-    Uranus->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Uranus->SetParent(uranus_pivot);
+    Uranus->GetTransform()->SetScale(Vec2(1.0f, 1.0f));
+    Uranus->SetCenterPosition();
+    Uranus->SetPosition(Vec2(dis, dis));
+    Uranus->SetSelfRotate(8.f);
     Uranus->ToggleSelfRotation();
-    dis += n * 3.5f;
+    dis += n;
 
-    // 해왕성
+    // 해왕성 pivot (공전)
+    AddCelObjects(center);
+    CelestialObj* neptune_pivot = m_CelObjects.back();
+    neptune_pivot->SetInvisible(true);
+    neptune_pivot->SetCenterPosition();
+    neptune_pivot->SetParent(sun);
+    neptune_pivot->SetSelfRotate(5.f);
+    neptune_pivot->ToggleSelfRotation();
+
+    // 해왕성 (자전)
     AddCelObjects(D2D1_POINT_2F{});
     CelestialObj* Neptune = m_CelObjects.back();
-    Neptune->SetParent(sun);
-    Neptune->GetTransform()->SetScale(Vec2(1.8f, 1.8f));
-    Neptune->SetPosition(Vec2(-50 + dis, -50 + dis));
+    Neptune->SetParent(neptune_pivot);
+    Neptune->GetTransform()->SetScale(Vec2(0.9f, 0.9f));
+    Neptune->SetCenterPosition();
+    Neptune->SetPosition(Vec2(dis, dis));
+    Neptune->SetSelfRotate(7.f);
     Neptune->ToggleSelfRotation();
-    dis += n * 3.5f;
+    dis += n;
 
-    
 }
 
 void TransformPracticeScene::Tick(float deltaTime)
@@ -311,16 +406,46 @@ void TransformPracticeScene::Tick(float deltaTime)
 }
 void TransformPracticeScene::BitMapSetUp()
 {
-    string celBitmap = {};
-    string subCelBitmap = {};
+    std::wstring celBitmap[] = {
+        L"../Resource/cat.png", // Sun
+        L"../Resource/cat.png", // Mercury
+        L"../Resource/cat.png", // Venus
+        L"../Resource/cat.png", // Earth
+        L"../Resource/cat.png", // Mars
+        L"../Resource/cat.png", // Jupiter
+        L"../Resource/cat.png", // Saturn
+        L"../Resource/cat.png", // Uranus
+        L"../Resource/cat.png"  // Neptune
+    };
+
+    std::wstring subCelBitmap[] = {
+        L"../Resource/cat.png", // Moon
+        L"../Resource/cat.png", // Phobos
+        L"../Resource/cat.png", // Deimos
+        L"../Resource/cat.png", // Io
+        L"../Resource/cat.png", // Europa
+        L"../Resource/cat.png", // Ganymede
+        L"../Resource/cat.png", // Callisto
+        L"../Resource/cat.png", // Titan
+        L"../Resource/cat.png", // Enceladus
+        L"../Resource/cat.png", // Miranda
+        L"../Resource/cat.png", // Titania
+        L"../Resource/cat.png", // Oberon
+        L"../Resource/cat.png"  // Triton
+    };
+
     SolarSystemRenderer::Instance().CreateBitmapFromFile(L"../Resource/cat.png", *m_BitmapPtr.GetAddressOf()); // 기본값 고양이
 
-    for (int i = 0; i < SOLAR_SYSTEM; i++) { // 일단은 전부 고양이로
-        SolarSystemRenderer::Instance().CreateBitmapFromFile(L"../Resource/cat.png", *m_CelBitmapPtr[i].GetAddressOf());
+    for (int i = 0; i < 9; ++i)
+    {
+        SolarSystemRenderer::Instance().CreateBitmapFromFile(celBitmap[i].c_str(), *m_CelBitmapPtr[i].GetAddressOf()); // 태양 및 행성
     }
-   /* for (int i = 0; i < SOLAR_SATLELITE; i++) {
-        SolarSystemRenderer::Instance().CreateBitmapFromFile(L"../Resource/cat.png", *m_SubCelBitmapPtr[i].GetAddressOf());
-    }*/
+
+    for (int i = 0; i < 13; ++i)
+    {
+        SolarSystemRenderer::Instance().CreateBitmapFromFile(subCelBitmap[i].c_str(), *m_SatBitmapPtr[i].GetAddressOf()); // 위성
+    }
+
 }
 
 void TransformPracticeScene::OnResize(int width, int height)
@@ -420,20 +545,65 @@ void TransformPracticeScene::AddCelObjects(D2D1_POINT_2F point) { // 스크린 좌표
     D2D1_POINT_2F worldPt = cameraTM.TransformPoint(point); // 월드 포인터를 받아옴
 
     CelestialObj* pNewObj = nullptr;
-    if (m_CelObjects.size() < SOLAR_SYSTEM) { // 일단은 태양계만
-        pNewObj = new CelestialObj(m_CelBitmapPtr[solarCount++]); // 오브젝트 생성
-    }
-    else {
-        pNewObj = new CelestialObj(m_BitmapPtr); // 오브젝트 생성
-    }
-    
+
+    pNewObj = new CelestialObj(m_BitmapPtr); // 오브젝트 생성
+
     if (m_CelObjects.empty()) { pNewObj->SetLeader(true); } // 첫 생성 시 리더 설정
 
     pNewObj->SetPosition(Vec2(worldPt.x, worldPt.y)); // 월드 포지션으로 세팅
 
     m_CelObjects.push_back(pNewObj); // 생성된 Obj 배열에 추가
 }
+void TransformPracticeScene::AddCelObjects(D2D1_POINT_2F point, E_CelestialObj celObj) { // 스크린 좌표 획득
 
+    static int solarCount = 0;
+    MAT3X2F cameraTM = m_UnityCamera.GetViewMatrix(); // 카메라 행렬 (뷰)를 획득
+    cameraTM.Invert(); // 카메라 행렬 역연산
+
+    D2D1_POINT_2F worldPt = cameraTM.TransformPoint(point); // 월드 포인터를 받아옴
+
+    CelestialObj* pNewObj = nullptr;
+
+    // 오브젝트 생성
+    switch (celObj)
+    {
+    case E_CelestialObj::Sun:        pNewObj = new CelestialObj(m_CelBitmapPtr[0]); break;
+    case E_CelestialObj::Mercury:    pNewObj = new CelestialObj(m_CelBitmapPtr[1]); break;
+    case E_CelestialObj::Venus:      pNewObj = new CelestialObj(m_CelBitmapPtr[2]); break;
+    case E_CelestialObj::Earth:      pNewObj = new CelestialObj(m_CelBitmapPtr[3]); break;
+    case E_CelestialObj::Mars:       pNewObj = new CelestialObj(m_CelBitmapPtr[4]); break;
+    case E_CelestialObj::Jupiter:    pNewObj = new CelestialObj(m_CelBitmapPtr[5]); break;
+    case E_CelestialObj::Saturn:     pNewObj = new CelestialObj(m_CelBitmapPtr[6]); break;
+    case E_CelestialObj::Uranus:     pNewObj = new CelestialObj(m_CelBitmapPtr[7]); break;
+    case E_CelestialObj::Neptune:    pNewObj = new CelestialObj(m_CelBitmapPtr[8]); break;
+    default:
+        pNewObj = nullptr; break;
+    }
+     
+    if (m_CelObjects.empty()) { pNewObj->SetLeader(true); } // 첫 생성 시 리더 설정
+
+    pNewObj->SetPosition(Vec2(worldPt.x, worldPt.y)); // 월드 포지션으로 세팅
+
+    m_CelObjects.push_back(pNewObj); // 생성된 Obj 배열에 추가
+}
+void TransformPracticeScene::AddCelObjects(D2D1_POINT_2F point, E_Satellite) { // 스크린 좌표 획득
+
+    static int solarCount = 0;
+    MAT3X2F cameraTM = m_UnityCamera.GetViewMatrix(); // 카메라 행렬 (뷰)를 획득
+    cameraTM.Invert(); // 카메라 행렬 역연산
+
+    D2D1_POINT_2F worldPt = cameraTM.TransformPoint(point); // 월드 포인터를 받아옴
+
+    CelestialObj* pNewObj = nullptr;
+    
+    pNewObj = new CelestialObj(m_BitmapPtr); // 오브젝트 생성
+
+    if (m_CelObjects.empty()) { pNewObj->SetLeader(true); } // 첫 생성 시 리더 설정
+
+    pNewObj->SetPosition(Vec2(worldPt.x, worldPt.y)); // 월드 포지션으로 세팅
+
+    m_CelObjects.push_back(pNewObj); // 생성된 Obj 배열에 추가
+}
 
 
 void TransformPracticeScene::ClearCelObjects()
